@@ -2,4 +2,6 @@ games/
 versions/
 .idea/
 run_tournament.sh
+chesspp-match.pgn
+config.json
 plan.txt

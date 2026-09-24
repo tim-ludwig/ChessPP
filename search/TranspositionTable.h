@@ -34,9 +34,14 @@ public:
 
     void store(Entry const& entry) {
         std::size_t index = entry.key % size;
-        if (entries[index].key == entry.key || entries[index].depth < entry.depth) {
-            if (entries[index].depth < 0) used_entries++;
-            entries[index] = entry;
+        Entry& current = entries[index];
+        bool same_position = current.key == entry.key;
+        bool replace = current.depth < 0
+                    || same_position
+                    || current.depth < entry.depth;
+        if (replace) {
+            if (current.depth < 0) used_entries++;
+            current = entry;
         }
     }
 

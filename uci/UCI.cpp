@@ -113,7 +113,8 @@ void UCI::handle_go(std::vector<std::string> const& tokens) {
                 .max_depth = max_depth,
                 .deadline = deadline
             },
-            .tt = TranspositionTable()
+            .search_tt = TranspositionTable(1 << 20),
+            .qsearch_tt = TranspositionTable(1 << 20)
         };
         Search::Result result = search.run(stop);
 

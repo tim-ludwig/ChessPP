@@ -33,12 +33,14 @@ public:
   Board& board;
   Options options;
   Info info;
-  TranspositionTable tt;
+  TranspositionTable search_tt;
+  TranspositionTable qsearch_tt;
   std::stop_token stop;
 
   Result run(std::stop_token const& token);
 
 private:
+  Score qsearch(int ply, Score alpha, Score beta);
   Score negamax(int depth, int ply, Score alpha, Score beta);
   Result search_root(int depth, Move previous_best);
   bool depth_allowed(int depth) const;

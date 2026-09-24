@@ -43,7 +43,7 @@ struct Board {
 
     void print(Color perspective=WHITE) const;
 
-    bool is_insufficient_material() const;
+    bool is_draw() const;
 
 private:
     Piece remove_piece(Square square);
@@ -52,6 +52,7 @@ private:
     Piece move_piece(Square from, Square to);
 
     uint64_t compute_zobrist_hash() const;
+    bool is_insufficient_material() const;
 };
 
 #endif //CHESSPP_BOARD_H

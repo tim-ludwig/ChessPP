@@ -234,6 +234,25 @@ bool Board::is_insufficient_material() const {
     return true;
 }
 
+bool Board::is_draw() const {
+    int fmc = state_stack.back().fifty_move_counter;
+    if (fmc >= 100) return true;
+
+    if (fmc >= 4) {
+        int count = 0;
+        uint64_t zhash = zhash_stack.back();
+        for (int i = 2; i <= fmc; i += 2) {
+            if (zhash_stack[zhash_stack.size() - 1 - i] == zhash) {
+                count++;
+            }
+        }
+        if (count >= 2) return true;
+
+    }
+
+    return is_insufficient_material();
+}
+
 uint64_t Board::compute_zobrist_hash() const {
     uint64_t hash = 0;
     for (int square = 0; square < 64; square++) {
