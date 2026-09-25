@@ -129,7 +129,12 @@ void UCI::handle_go(std::vector<std::string> const& tokens) {
         } else {
             std::cout << "info score cp " << result.score << std::endl;
         }
-        std::cout << "bestmove " << result.best_move.coordinate_notation() << std::endl;
+
+        std::cout << "bestmove " << result.pv[0].coordinate_notation();
+        if (result.pv.size() > 1) {
+            std::cout << " ponder " << result.pv[1].coordinate_notation();
+        }
+        std::cout << std::endl;
     });
 }
 

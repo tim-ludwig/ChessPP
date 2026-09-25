@@ -4,6 +4,8 @@
 
 #include "search.h"
 
+#include <cstring>
+
 #include "MoveOrdering.h"
 
 #include "../move_gen/MoveGen.h"
@@ -93,7 +95,7 @@ Score Search::qsearch(int ply, Score alpha, Score beta) {
     return best;
 }
 
-Score Search::negamax(int depth, int ply, Score alpha, Score beta) {
+Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, PV const* prev_pv) {
     if (SEARCH_STOPPED) return 0;
 
     info.nodes++;
@@ -109,6 +111,8 @@ Score Search::negamax(int depth, int ply, Score alpha, Score beta) {
             Score tt_score = score_from_tt(entry->score, ply);
             switch (entry->bound) {
                 case TranspositionTable::Entry::EXACT:
+                    pv.len = 1;
+                    pv.moves[0] = tt_move;
                     return tt_score;
 
                 case TranspositionTable::Entry::LOWER:
@@ -130,18 +134,29 @@ Score Search::negamax(int depth, int ply, Score alpha, Score beta) {
         return qsearch(ply, alpha, beta);
     }
 
+    Move pv_buffer[depth];
+    PV child_pv = {
+        .len = 0,
+        .moves = pv_buffer
+    };
+
     MoveList moves = legal_moves(board);
     if (moves.size() == 0) {
         return moves.legality().checkers ? -MATE + ply : 0;
     }
+
+    Move first_move = prev_pv && prev_pv->len > ply ? prev_pv->moves[ply] : tt_move;
+    MoveOrdering move_ordering(board, moves, first_move);
+
     Score original_alpha = alpha;
     Move best_move = Move::null();
-    MoveOrdering move_ordering(board, moves, tt_move);
     for (int i = 0; i < moves.size(); i++) {
         Move move = move_ordering.getMove();
 
         board.make_move(move);
-        Score score = -negamax(depth - 1, ply + 1, -beta, -alpha);
+        Score score = -search(depth - 1, ply + 1,
+            -beta, -alpha,
+            child_pv, i == 0 ? prev_pv : nullptr);
         board.unmake_move(move);
 
         if (SEARCH_STOPPED) return 0;
@@ -149,6 +164,9 @@ Score Search::negamax(int depth, int ply, Score alpha, Score beta) {
         if (score > alpha) {
             alpha = score;
             best_move = move;
+            memcpy(pv.moves + 1, child_pv.moves, child_pv.len * sizeof(Move));
+            pv.moves[0] = move;
+            pv.len = child_pv.len + 1;
         }
         if (alpha >= beta) {
             break;
@@ -174,54 +192,41 @@ Score Search::negamax(int depth, int ply, Score alpha, Score beta) {
     return alpha;
 }
 
-Search::Result Search::search_root(int depth, Move prev_best) {
-    info.nodes++;
-
-    MoveList moves = legal_moves(board);
-
-    Result result {
-        .score = -INF,
-        .best_move = prev_best != Move::null() ? prev_best : moves[0]
-    };
-
-    MoveOrdering move_ordering(board, moves, prev_best);
-    Score alpha = -INF;
-    for (int i = 0; i < moves.size(); i++) {
-        Move move = move_ordering.getMove();
-
-        board.make_move(move);
-        auto score = -negamax(depth - 1, 1, -INF, -alpha);
-        board.unmake_move(move);
-
-        if (SEARCH_STOPPED) return result;
-
-        if (score > alpha) {
-            alpha = score;
-            result.score = score;
-            result.best_move = move;
-        }
-    }
-
-    return result;
-}
-
 Search::Result Search::run(std::stop_token const& token) {
     stop = token;
 
+    MoveList moves = legal_moves(board);
     Result result {
         .score = -INF,
-        .best_move = Move::null()
+        .pv = {moves[0]}
     };
     for (int d = 1; depth_allowed(d); d++) {
         info.nodes = 0;
-        Result r = search_root(d, result.best_move);
 
-        result.best_move = r.best_move;
+        Move pv_buffer[d];
+        PV child_pv = {
+            .len = 0,
+            .moves = pv_buffer
+        };
+        PV prev_pv = {
+            .len = result.pv.size(),
+            .moves = result.pv.data()
+        };
+
+        Score score = search(d, 0, -INF, INF, child_pv, &prev_pv);
+
+        result.pv.assign(pv_buffer, pv_buffer + child_pv.len);
         if (SEARCH_STOPPED) break;
-        result.score = r.score;
+        result.score = score;
 
         info.depth = d;
-        std::cout << "info depth " << d << " nodes " << info.nodes << " hashfull " << search_tt.hashfull() << std::endl;
+        std::cout << "info depth " << d << " nodes " << info.nodes << " pv";
+        for (Move move : result.pv) {
+            std::cout << " " << move.coordinate_notation();
+        }
+        std::cout << std::endl;
+
+        std::cout << "hashfull " << search_tt.hashfull() << std::endl;
         if (result.score > MATE_THRESHOLD || result.score < -MATE_THRESHOLD) break;
     }
 

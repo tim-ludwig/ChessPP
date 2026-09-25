@@ -16,7 +16,7 @@ class Search {
 public:
   using Result = struct {
     Score score;
-    Move best_move;
+    std::vector<Move> pv;
   };
 
   using Info = struct {
@@ -40,9 +40,13 @@ public:
   Result run(std::stop_token const& token);
 
 private:
+  using PV = struct {
+    std::size_t len;
+    Move *moves;
+  };
+
   Score qsearch(int ply, Score alpha, Score beta);
-  Score negamax(int depth, int ply, Score alpha, Score beta);
-  Result search_root(int depth, Move previous_best);
+  Score search(int depth, int ply, Score alpha, Score beta, PV& pv_buffer, PV const* prev_pv);
   bool depth_allowed(int depth) const;
 };
 
