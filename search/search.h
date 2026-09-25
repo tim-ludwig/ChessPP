@@ -29,6 +29,11 @@ public:
     std::optional<std::chrono::steady_clock::time_point> deadline;
   };
 
+  using NodeType = enum {
+    PVNode,
+    NonPVNode
+  };
+
 public:
   Board& board;
   Options options;
@@ -46,6 +51,7 @@ private:
   };
 
   Score qsearch(int ply, Score alpha, Score beta);
+  template<NodeType node_type>
   Score search(int depth, int ply, Score alpha, Score beta, PV& pv_buffer, PV const* prev_pv);
   bool depth_allowed(int depth) const;
 };

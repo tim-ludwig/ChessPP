@@ -5,6 +5,7 @@
 #include "search.h"
 
 #include <cstring>
+#include <oneapi/tbb/partitioner.h>
 
 #include "MoveOrdering.h"
 
@@ -95,6 +96,7 @@ Score Search::qsearch(int ply, Score alpha, Score beta) {
     return best;
 }
 
+template<Search::NodeType node_type>
 Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, PV const* prev_pv) {
     if (SEARCH_STOPPED) return 0;
 
@@ -150,13 +152,26 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, PV con
 
     Score original_alpha = alpha;
     Move best_move = Move::null();
+    constexpr bool is_pv_node = node_type == PVNode;
     for (int i = 0; i < moves.size(); i++) {
         Move move = move_ordering.getMove();
 
+        Score score;
         board.make_move(move);
-        Score score = -search(depth - 1, ply + 1,
-            -beta, -alpha,
-            child_pv, i == 0 ? prev_pv : nullptr);
+        if (i == 0) {
+            score = -search<node_type>(depth - 1, ply + 1,
+                -beta, -alpha,
+                child_pv, i == 0 ? prev_pv : nullptr);
+        } else {
+            score = -search<NonPVNode>(depth - 1, ply + 1,
+                -alpha - 1, -alpha,
+                child_pv, nullptr);
+            if (is_pv_node && score > alpha) {
+                score = -search<PVNode>(depth - 1, ply + 1,
+                    -beta, -alpha,
+                    child_pv, nullptr);
+            }
+        }
         board.unmake_move(move);
 
         if (SEARCH_STOPPED) return 0;
@@ -213,7 +228,7 @@ Search::Result Search::run(std::stop_token const& token) {
             .moves = result.pv.data()
         };
 
-        Score score = search(d, 0, -INF, INF, child_pv, &prev_pv);
+        Score score = search<PVNode>(d, 0, -INF, INF, child_pv, &prev_pv);
 
         result.pv.assign(pv_buffer, pv_buffer + child_pv.len);
         if (SEARCH_STOPPED) break;
