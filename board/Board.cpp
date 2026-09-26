@@ -241,7 +241,7 @@ bool Board::is_draw() const {
     if (fmc >= 4) {
         int count = 0;
         uint64_t zhash = zhash_stack.back();
-        for (int i = 2; i <= fmc; i += 2) {
+        for (int i = 2; i <= fmc && i < zhash_stack.size(); i += 2) {
             if (zhash_stack[zhash_stack.size() - 1 - i] == zhash) {
                 count++;
             }
