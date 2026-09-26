@@ -21,7 +21,7 @@ public:
 
   using Info = struct {
     int depth;
-    int nodes;
+    std::size_t nodes;
   };
 
   using Options = struct {
@@ -52,7 +52,7 @@ private:
 
   Score qsearch(int ply, Score alpha, Score beta);
   template<NodeType node_type>
-  Score search(int depth, int ply, Score alpha, Score beta, PV& pv_buffer, PV const* prev_pv);
+  Score search(int depth, int ply, Score alpha, Score beta, PV& pv_buffer, std::vector<Move> const& prev_pv, bool play_from_prev_pv);
   bool depth_allowed(int depth) const;
 };
 
