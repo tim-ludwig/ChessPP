@@ -133,6 +133,7 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
     }
 
     if (depth == 0) {
+        info.nodes--;
         return qsearch(ply, alpha, beta);
     }
 
