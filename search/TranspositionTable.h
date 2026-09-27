@@ -15,13 +15,16 @@ class TranspositionTable {
 public:
     using Entry = struct Entry {
         uint64_t key = 0;
+        std::size_t generation = 0;
+        int depth = -1;
         Move best_move = Move::null();
         Score score = 0;
-        int depth = -1;
         enum Bound { EXACT, LOWER, UPPER } bound = EXACT;
     };
 
-    explicit TranspositionTable(std::size_t s=TT_DEFAULT_SIZE) : size(s), entries(s) {}
+    std::size_t generation;
+
+    explicit TranspositionTable(std::size_t s=TT_DEFAULT_SIZE) : size(s), entries(s), generation(0) {}
 
     Entry* lookup(uint64_t key) {
         size_t index = key % size;
@@ -37,12 +40,17 @@ public:
         Entry& current = entries[index];
         bool same_position = current.key == entry.key;
         bool replace = current.depth < 0
+                    || current.generation < generation
                     || same_position
                     || current.depth < entry.depth;
         if (replace) {
             if (current.depth < 0) used_entries++;
             current = entry;
         }
+    }
+
+    void new_generation() {
+        generation++;
     }
 
     std::size_t hashfull() const {

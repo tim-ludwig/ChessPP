@@ -11,10 +11,8 @@
 
 #include "../move_gen/MoveGen.h"
 
-#define SEARCH_STOPPED (stop.stop_requested() || (options.deadline && std::chrono::steady_clock::now() >= options.deadline.value()))
-
 Score Search::qsearch(int ply, Score alpha, Score beta) {
-    if (SEARCH_STOPPED) return 0;
+    if (search_stopped()) return 0;
 
     info.nodes++;
 
@@ -47,9 +45,10 @@ Score Search::qsearch(int ply, Score alpha, Score beta) {
         if (best >= beta) {
             qsearch_tt.store({
                 .key = board.zhash_stack.back(),
+                .generation = qsearch_tt.generation,
+                .depth = 0,
                 .best_move = best_move,
                 .score = score_to_tt(best, ply),
-                .depth = 0,
                 .bound = TranspositionTable::Entry::LOWER
             });
             return best;
@@ -68,7 +67,7 @@ Score Search::qsearch(int ply, Score alpha, Score beta) {
             Score score = -qsearch(ply + 1, -beta, -alpha);
             board.unmake_move(move);
 
-            if (SEARCH_STOPPED) return 0;
+            if (search_stopped()) return 0;
             if (score > best) {
                 best = score;
                 best_move = move;
@@ -87,18 +86,31 @@ Score Search::qsearch(int ply, Score alpha, Score beta) {
         bound = TranspositionTable::Entry::EXACT;
     qsearch_tt.store({
         .key = board.zhash_stack.back(),
+        .generation = qsearch_tt.generation,
+        .depth = 0,
         .best_move = best_move,
         .score = score_to_tt(best, ply),
-        .depth = 0,
         .bound = bound
     });
 
     return best;
 }
 
+void Search::build_pv_from_tt(Board& board, int depth, TranspositionTable& tt, PV& pv) {
+    if (depth == 0) return;
+
+    auto* entry = tt.lookup(board.zhash_stack.back());
+    if (entry == nullptr || entry->best_move == Move::null()) return;
+
+    pv.moves[pv.len++] = entry->best_move;
+    board.make_move(entry->best_move);
+    build_pv_from_tt(board, depth - 1, tt, pv);
+    board.unmake_move(entry->best_move);
+}
+
 template<Search::NodeType node_type>
 Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::vector<Move> const& prev_pv, bool play_from_prev_pv) {
-    if (SEARCH_STOPPED) return 0;
+    if (search_stopped()) return 0;
 
     info.nodes++;
 
@@ -113,8 +125,8 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
             Score tt_score = score_from_tt(entry->score, ply);
             switch (entry->bound) {
                 case TranspositionTable::Entry::EXACT:
-                    pv.len = 1;
-                    pv.moves[0] = tt_move;
+                    pv.len = 0;
+                    build_pv_from_tt(board, depth, search_tt, pv);
                     return tt_score;
 
                 case TranspositionTable::Entry::LOWER:
@@ -177,7 +189,7 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
         }
         board.unmake_move(move);
 
-        if (SEARCH_STOPPED) return 0;
+        if (search_stopped()) return 0;
 
         if (score > alpha) {
             alpha = score;
@@ -203,9 +215,10 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
 
     search_tt.store({
         .key = board.zhash_stack.back(),
+        .generation = search_tt.generation,
+        .depth = depth,
         .best_move = best_move,
         .score = score_to_tt(alpha, ply),
-        .depth = depth,
         .bound = bound
     });
 
@@ -231,7 +244,7 @@ Search::Result Search::run(std::stop_token const& token) {
         Score score = search<PVNode>(d, 0, -INF, INF, child_pv, result.pv, true);
         result.pv.assign(child_pv.moves, child_pv.moves + child_pv.len);
 
-        if (SEARCH_STOPPED) break;
+        if (search_stopped()) break;
         result.score = score;
 
         info.depth = d;
@@ -242,12 +255,9 @@ Search::Result Search::run(std::stop_token const& token) {
         std::cout << std::endl;
 
         std::cout << "info hashfull " << search_tt.hashfull() << std::endl;
-        if (result.score > MATE_THRESHOLD || result.score < -MATE_THRESHOLD) break;
+        if (!options.pondering && (result.score > MATE_THRESHOLD || result.score < -MATE_THRESHOLD)) break;
     }
-
+    search_tt.new_generation();
+    qsearch_tt.new_generation();
     return result;
-}
-
-bool Search::depth_allowed(int depth) const {
-    return !options.max_depth || depth <= options.max_depth.value();
 }

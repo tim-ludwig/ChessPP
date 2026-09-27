@@ -4,7 +4,7 @@
 
 #include "UCI.h"
 
-#include <limits.h>
+#include <climits>
 #include <map>
 #include <sstream>
 #include <thread>
@@ -84,38 +84,38 @@ void UCI::handle_go(std::vector<std::string> const& tokens) {
         return;
     }
 
-    std::optional<int> max_depth;
     if (options.contains("depth")) {
-        max_depth = std::stoi(options["depth"]);
+        search.options.max_depth = std::stoi(options["depth"]);
     } else {
-        max_depth = std::nullopt;
+        search.options.max_depth = std::nullopt;
     }
 
-    std::optional<std::chrono::steady_clock::time_point> deadline;
     std::string time_option = board.to_move == WHITE ? "wtime" : "btime";
     std::string inc_option = board.to_move == WHITE ? "winc" : "binc";
-    if (options.contains(time_option)) {
+    if (options.contains("movetime")) {
+        int movetime = std::stoi(options["movetime"]);
+        search.options.time_budget = std::chrono::milliseconds(movetime - 100);
+    } else if (options.contains(time_option)) {
         int time = std::stoi(options[time_option]);
         int inc = options.contains(inc_option) ? std::stoi(options[inc_option]) : 0;
         int movestogo = options.contains("movestogo") ? std::stoi(options["movestogo"]) : 20;
         if (movestogo == 0) movestogo = 1;
         int budget = time / movestogo + inc / 2;
         budget = std::min(budget, time - 100);
-        deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(budget);
+        search.options.time_budget = std::chrono::milliseconds(budget);
     } else {
-        deadline = std::nullopt;
+        search.options.time_budget = std::nullopt;
     }
 
-    worker = std::jthread([this, max_depth, deadline](std::stop_token const& stop) {
-        Search search{
-            .board = board,
-            .options = {
-                .max_depth = max_depth,
-                .deadline = deadline
-            },
-            .search_tt = TranspositionTable(1 << 20),
-            .qsearch_tt = TranspositionTable(1 << 20)
-        };
+    if (options.contains("ponder")) {
+        search.options.start_time = std::nullopt;
+        search.options.pondering = true;
+    } else {
+        search.options.start_time = std::chrono::steady_clock::now();
+        search.options.pondering = false;
+    }
+
+    worker = std::jthread([this](std::stop_token const& stop) {
         Search::Result result = search.run(stop);
 
         if (result.score == INF || result.score == -INF) {
@@ -165,6 +165,9 @@ void UCI::repl() {
                 worker.join();
             }
             handle_go(tokens);
+        } else if (tokens[0] == "ponderhit") {
+            search.options.start_time = std::chrono::steady_clock::now();
+            search.options.pondering = false;
         } else if (tokens[0] == "stop") {
             worker.request_stop();
             if (worker.joinable()) {

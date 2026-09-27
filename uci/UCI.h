@@ -5,15 +5,18 @@
 #ifndef CHESSPP_UCI_H
 #define CHESSPP_UCI_H
 
-#include <iostream>
 #include <thread>
 
+#include "../search/search.h"
 #include "../board/Board.h"
 
 class UCI {
 private:
     std::jthread worker;
     Board board;
+    Search search{
+        .board = board
+    };
 
 public:
     void repl();

@@ -26,7 +26,9 @@ public:
 
   using Options = struct {
     std::optional<int> max_depth;
-    std::optional<std::chrono::steady_clock::time_point> deadline;
+    bool pondering;
+    std::optional<std::chrono::steady_clock::time_point> start_time;
+    std::optional<std::chrono::steady_clock::duration> time_budget;
   };
 
   using NodeType = enum {
@@ -38,8 +40,8 @@ public:
   Board& board;
   Options options;
   Info info;
-  TranspositionTable search_tt;
-  TranspositionTable qsearch_tt;
+  TranspositionTable search_tt{1 << 20};
+  TranspositionTable qsearch_tt{1 << 20};
   std::stop_token stop;
 
   Result run(std::stop_token const& token);
@@ -53,7 +55,15 @@ private:
   Score qsearch(int ply, Score alpha, Score beta);
   template<NodeType node_type>
   Score search(int depth, int ply, Score alpha, Score beta, PV& pv_buffer, std::vector<Move> const& prev_pv, bool play_from_prev_pv);
-  bool depth_allowed(int depth) const;
+
+  void build_pv_from_tt(Board& board, int depth, TranspositionTable& tt, PV& pv);
+
+  bool depth_allowed(int depth) const {
+    return !options.max_depth || depth <= options.max_depth.value();
+  }
+  bool search_stopped() const {
+    return stop.stop_requested() || (options.start_time && options.time_budget && std::chrono::steady_clock::now() >= options.start_time.value() + options.time_budget.value());
+  }
 };
 
 
