@@ -100,7 +100,17 @@ void Search::build_pv_from_tt(Board& board, int depth, TranspositionTable& tt, P
     if (depth == 0) return;
 
     auto* entry = tt.lookup(board.zhash_stack.back());
-    if (entry == nullptr || entry->best_move == Move::null()) return;
+    if (entry == nullptr || entry->best_move == Move::null() || entry->depth < depth) return;
+
+    MoveList moves = legal_moves(board);
+    bool found = false;
+    for (int i = 0; i < moves.size(); i++) {
+        if (moves[i] == entry->best_move) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) return;
 
     pv.moves[pv.len++] = entry->best_move;
     board.make_move(entry->best_move);
@@ -110,6 +120,7 @@ void Search::build_pv_from_tt(Board& board, int depth, TranspositionTable& tt, P
 
 template<Search::NodeType node_type>
 Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::vector<Move> const& prev_pv, bool play_from_prev_pv) {
+    constexpr bool is_pv_node = node_type == PVNode;
     if (search_stopped()) return 0;
 
     info.nodes++;
@@ -125,8 +136,10 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
             Score tt_score = score_from_tt(entry->score, ply);
             switch (entry->bound) {
                 case TranspositionTable::Entry::EXACT:
-                    pv.len = 0;
-                    build_pv_from_tt(board, depth, search_tt, pv);
+                    if constexpr (is_pv_node) {
+                        pv.len = 0;
+                        build_pv_from_tt(board, depth, search_tt, pv);
+                    }
                     return tt_score;
 
                 case TranspositionTable::Entry::LOWER:
@@ -165,7 +178,6 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
 
     Score original_alpha = alpha;
     Move best_move = Move::null();
-    constexpr bool is_pv_node = node_type == PVNode;
     for (int i = 0; i < moves.size(); i++) {
         Move move = move_ordering.getMove();
 
