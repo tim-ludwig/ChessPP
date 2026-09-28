@@ -19,9 +19,13 @@ public:
     std::vector<Move> pv;
   };
 
-  using Info = struct {
-    int depth;
-    std::size_t nodes;
+  using Info = struct Info {
+    int depth = 0;
+    std::size_t nodes = 0;
+    std::size_t tt_cuts = 0;
+    std::size_t beta_cuts = 0;
+    std::size_t first_move_cuts = 0;
+    std::size_t pv_researches = 0;
   };
 
   using Options = struct {

@@ -5,11 +5,11 @@
 #include "search.h"
 
 #include <cstring>
-#include <oneapi/tbb/partitioner.h>
 
 #include "MoveOrdering.h"
 
 #include "../move_gen/MoveGen.h"
+#include "../uci/UCI.h"
 
 Score Search::qsearch(int ply, Score alpha, Score beta) {
     if (search_stopped()) return 0;
@@ -123,8 +123,6 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
     constexpr bool is_pv_node = node_type == PVNode;
     if (search_stopped()) return 0;
 
-    info.nodes++;
-
     if (board.is_draw()) return 0;
 
     auto* entry = search_tt.lookup(board.zhash_stack.back());
@@ -140,16 +138,19 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
                         pv.len = 0;
                         build_pv_from_tt(board, depth, search_tt, pv);
                     }
+                    info.tt_cuts++;
                     return tt_score;
 
                 case TranspositionTable::Entry::LOWER:
                     if (tt_score >= beta) {
+                        info.tt_cuts++;
                         return tt_score;
                     }
                     break;
 
                 case TranspositionTable::Entry::UPPER:
                     if (tt_score <= alpha) {
+                        info.tt_cuts++;
                         return tt_score;
                     }
                     break;
@@ -161,6 +162,8 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
         info.nodes--;
         return qsearch(ply, alpha, beta);
     }
+
+    info.nodes++;
 
     MoveList moves = legal_moves(board);
     if (moves.size() == 0) {
@@ -193,6 +196,7 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
                 child_pv, prev_pv, false);
             if constexpr (is_pv_node) {
                 if (alpha < score && score < beta) {
+                    info.pv_researches++;
                     score = -search<PVNode>(depth - 1, ply + 1,
                         -beta, -alpha,
                         child_pv, prev_pv, false);
@@ -213,6 +217,8 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
             }
         }
         if (alpha >= beta) {
+            info.beta_cuts++;
+            if (i == 0) info.first_move_cuts++;
             break;
         }
     }
@@ -246,27 +252,49 @@ Search::Result Search::run(std::stop_token const& token) {
         .pv = {moves[0]}
     };
     for (int d = 1; depth_allowed(d); d++) {
+        info.depth = d;
         info.nodes = 0;
+        info.beta_cuts = 0;
+        info.first_move_cuts = 0;
+        info.pv_researches = 0;
+        info.tt_cuts = 0;
+
 
         Move pv_buffer[d];
         PV child_pv = {
             .len = 0,
             .moves = pv_buffer
         };
+        auto depth_start =  std::chrono::steady_clock::now();
         Score score = search<PVNode>(d, 0, -INF, INF, child_pv, result.pv, true);
+        auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - depth_start).count();
         result.pv.assign(child_pv.moves, child_pv.moves + child_pv.len);
 
         if (search_stopped()) break;
         result.score = score;
 
-        info.depth = d;
-        std::cout << "info depth " << d << " nodes " << info.nodes << " pv";
+        std::cout << "info depth " << d;
+        if (result.score > MATE_THRESHOLD || result.score < -MATE_THRESHOLD) {
+            std::cout << " score mate " << score_to_mate_moves(result.score);
+        } else {
+            std::cout << " score cp " << result.score;
+        }
+        std::cout << " nodes " << info.nodes;
+        uint64_t nps = elapsed_ms > 0
+            ? info.nodes * 1000 / elapsed_ms
+            : 0;
+        std::cout << " nps " << nps;
+        std::cout << " hashfull " << search_tt.hashfull();
+        std::cout << " pv";
         for (Move move : result.pv) {
             std::cout << " " << move.coordinate_notation();
         }
         std::cout << std::endl;
 
-        std::cout << "info hashfull " << search_tt.hashfull() << std::endl;
+        std::cout << "info string beta_cuts " << info.beta_cuts << std::endl;
+        std::cout << "info string first_move_cuts " << info.first_move_cuts << std::endl;
+        std::cout << "info string pv_researches " << info.pv_researches << std::endl;
+        std::cout << "info string tt_cuts " << info.tt_cuts << std::endl;
         if (!options.pondering && (result.score > MATE_THRESHOLD || result.score < -MATE_THRESHOLD)) break;
     }
     search_tt.new_generation();

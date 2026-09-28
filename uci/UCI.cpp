@@ -121,11 +121,7 @@ void UCI::handle_go(std::vector<std::string> const& tokens) {
         if (result.score == INF || result.score == -INF) {
             // silently ignore this, as it means the search was stopped before a meaningful score was found
         } else if (result.score > MATE_THRESHOLD || result.score < -MATE_THRESHOLD) {
-            int moves_from_mate = (MATE - std::abs(result.score) + 1) / 2;
-            if (result.score < 0) {
-                moves_from_mate = -moves_from_mate;
-            }
-            std::cout << "info score mate " << moves_from_mate << std::endl;
+            std::cout << "info score mate " << score_to_mate_moves(result.score) << std::endl;
         } else {
             std::cout << "info score cp " << result.score << std::endl;
         }
@@ -136,6 +132,17 @@ void UCI::handle_go(std::vector<std::string> const& tokens) {
         }
         std::cout << std::endl;
     });
+}
+
+void UCI::handle_debug(const std::vector<std::string>& tokens) {
+    if (tokens[1] == "print") {
+        board.print();
+    } else if (tokens[1] == "zhash") {
+        for (int i = 0; i < board.zhash_stack.size(); i++) {
+            std::cout << std::hex << board.zhash_stack[i] << std::dec << std::endl;
+        }
+        std::cout << "repetition count: " << board.repetiton_count() << std::endl;
+    }
 }
 
 void UCI::repl() {
@@ -173,8 +180,8 @@ void UCI::repl() {
             if (worker.joinable()) {
                 worker.join();
             }
-        } else if (tokens[0] == "show") {
-            board.print();
+        } else if (tokens[0] == "debug") {
+            handle_debug(tokens);
         }
     }
 
