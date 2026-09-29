@@ -234,7 +234,7 @@ bool Board::is_insufficient_material() const {
     return true;
 }
 
-int Board::repetiton_count() const {
+int Board::repetition_count() const {
     int count = 0;
     uint64_t zhash = zhash_stack.back();
     for (int i = 0; i <= state_stack.back().fifty_move_counter && i < zhash_stack.size(); i += 2) {
@@ -247,7 +247,7 @@ int Board::repetiton_count() const {
 
 bool Board::is_draw() const {
     if (state_stack.back().fifty_move_counter >= 100) return true;
-    if (repetiton_count() >= 3) return true;
+    if (repetition_count() >= 3) return true;
     if (is_insufficient_material()) return true;
     return false;
 }

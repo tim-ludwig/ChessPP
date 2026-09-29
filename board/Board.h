@@ -43,7 +43,7 @@ struct Board {
 
     void print(Color perspective=WHITE) const;
 
-    int repetiton_count() const;
+    int repetition_count() const;
     bool is_draw() const;
 
 private:

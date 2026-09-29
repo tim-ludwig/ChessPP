@@ -141,7 +141,7 @@ void UCI::handle_debug(const std::vector<std::string>& tokens) {
         for (int i = 0; i < board.zhash_stack.size(); i++) {
             std::cout << std::hex << board.zhash_stack[i] << std::dec << std::endl;
         }
-        std::cout << "repetition count: " << board.repetiton_count() << std::endl;
+        std::cout << "repetition count: " << board.repetition_count() << std::endl;
     }
 }
 
