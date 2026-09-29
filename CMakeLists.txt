@@ -27,4 +27,5 @@ add_executable(ChessPP main.cpp
         precompute/zobrist.cpp
         precompute/movement.h
         precompute/movement.cpp
-        search/TranspositionTable.h)
+        search/TranspositionTable.h
+        search/MoveOrdering.cpp)

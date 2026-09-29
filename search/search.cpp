@@ -20,8 +20,10 @@ Score Search::qsearch(int ply, Score alpha, Score beta) {
 
     uint64_t zhash = board.zhash_stack.back();
     auto* entry = qsearch_tt.lookup(zhash);
+    Move tt_move = Move::null();
     if (entry != nullptr) {
         Score tt_score = score_from_tt(entry->score, ply);
+        tt_move = entry->best_move;
         switch (entry->bound) {
             case TranspositionTable::Entry::EXACT:
                 return tt_score;
@@ -60,7 +62,7 @@ Score Search::qsearch(int ply, Score alpha, Score beta) {
     if (moves.size() == 0) {
         best = in_check ? -MATE + ply : alpha;
     } else {
-        MoveOrdering move_ordering(board, moves, entry != nullptr ? entry->best_move : Move::null());
+        MoveOrdering move_ordering(board, moves, Move::null(), tt_move);
         for (int i = 0; i < moves.size(); i++) {
             Move move = move_ordering.getMove();
             board.make_move(move);
@@ -176,8 +178,7 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
         .moves = pv_buffer
     };
 
-    Move first_move = play_from_prev_pv && prev_pv.size() > ply ? prev_pv[ply] : tt_move;
-    MoveOrdering move_ordering(board, moves, first_move);
+    MoveOrdering move_ordering(board, moves, play_from_prev_pv ? prev_pv[ply] : Move::null(), tt_move);
 
     Score original_alpha = alpha;
     Move best_move = Move::null();

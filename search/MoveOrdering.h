@@ -30,46 +30,34 @@ class MoveOrdering {
     int index = 0;
 
 public:
-    MoveOrdering(Board const& b, MoveList& m) : board(b), moves(m) {
-        scores.resize(m.size());
-
+    MoveOrdering(Board const& b, MoveList& m, Move pv_move, Move tt_move) : board(b), moves(m), scores(m.size()) {
         for (int i = 0; i < moves.size(); i++) {
-            int score = 0;
-
-            Move move = moves[i];
-            if (move.is_promotion()) {
-                score += 10000 + PIECE_VALUE[move.promotion_piece()];
-            }
-
-            if (move.is_capture()) {
-                Piece victim = board.pieces[move.to()];
-                Piece attacker = board.pieces[move.from()];
-
-                score += 5000
-                      + 10 * PIECE_VALUE[victim.type()]
-                      - PIECE_VALUE[attacker.type()];
-            }
-
-            scores[i] = score;
-        }
-    }
-
-    MoveOrdering(Board const& b, MoveList& m, Move prev_best) : MoveOrdering(b, m) {
-        if (prev_best == Move::null()) return;
-
-        for (int i = 0; i < moves.size(); i++) {
-            if (moves[i] == prev_best) {
-                std::swap(moves[i], moves[0]);
-                std::swap(scores[i], scores[0]);
+            if (moves[i] == pv_move) {
+                moves[i] = moves[0];
+                scores[i] = scores[0];
+                moves[0] = pv_move;
                 scores[0] = std::numeric_limits<Score>::max();
-                break;
+            } else if (moves[i] == tt_move) {
+                int tt_index = pv_move == Move::null() ? 0 : 1;
+                moves[i] = moves[tt_index];
+                scores[i] = scores[tt_index];
+                moves[tt_index] = tt_move;
+                scores[tt_index] = std::numeric_limits<Score>::max();
+            } else {
+                Move move = moves[i];
+                Score score = 0;
+
+                if (move.is_capture() || move.is_promotion()) {
+                    score += see(move);
+                }
+
+                scores[i] = score;
             }
         }
     }
 
     Move getMove() {
         if (index >= moves.size()) throw std::out_of_range("No more moves to order");
-        if (scores[index] == std::numeric_limits<Score>::max()) return moves[index++];
 
         int best_index = index;
         for (int i = index + 1; i < moves.size(); i++) {
@@ -81,6 +69,9 @@ public:
         std::swap(moves[best_index], moves[index]);
         return moves[index++];
     }
+
+private:
+    Score see(Move move);
 };
 
 
