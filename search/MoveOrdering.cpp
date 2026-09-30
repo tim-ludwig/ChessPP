@@ -29,6 +29,15 @@ BitBoard least_valuable_attackers(BitBoard attackers, const Board& board, Color 
     return 0;
 }
 
+constexpr int PIECE_VALUE[6] = {
+    100,  // pawn
+    320,  // knight
+    330,  // bishop
+    500,  // rook
+    900,  // queen
+    1000  // king
+};
+
 Score MoveOrdering::see(Move move) {
     Square sq = move.to();
 

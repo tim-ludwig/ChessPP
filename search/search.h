@@ -60,7 +60,7 @@ private:
   template<NodeType node_type>
   Score search(int depth, int ply, Score alpha, Score beta, PV& pv_buffer, std::vector<Move> const& prev_pv, bool play_from_prev_pv);
 
-  void build_pv_from_tt(Board& board, int depth, TranspositionTable& tt, PV& pv);
+  void build_pv_from_tt(int depth, TranspositionTable& tt, PV& pv);
 
   bool depth_allowed(int depth) const {
     return !options.max_depth || depth <= options.max_depth.value();

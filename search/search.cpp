@@ -98,8 +98,9 @@ Score Search::qsearch(int ply, Score alpha, Score beta) {
     return best;
 }
 
-void Search::build_pv_from_tt(Board& board, int depth, TranspositionTable& tt, PV& pv) {
+void Search::build_pv_from_tt(int depth, TranspositionTable& tt, PV& pv) {
     if (depth == 0) return;
+    if (board.is_draw()) return;
 
     auto* entry = tt.lookup(board.zhash_stack.back());
     if (entry == nullptr || entry->best_move == Move::null() || entry->depth < depth) return;
@@ -116,7 +117,7 @@ void Search::build_pv_from_tt(Board& board, int depth, TranspositionTable& tt, P
 
     pv.moves[pv.len++] = entry->best_move;
     board.make_move(entry->best_move);
-    build_pv_from_tt(board, depth - 1, tt, pv);
+    build_pv_from_tt(depth - 1, tt, pv);
     board.unmake_move(entry->best_move);
 }
 
@@ -138,7 +139,7 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
                 case TranspositionTable::Entry::EXACT:
                     if constexpr (is_pv_node) {
                         pv.len = 0;
-                        build_pv_from_tt(board, depth, search_tt, pv);
+                        build_pv_from_tt(depth, search_tt, pv);
                     }
                     info.tt_cuts++;
                     return tt_score;
@@ -178,7 +179,8 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
         .moves = pv_buffer
     };
 
-    MoveOrdering move_ordering(board, moves, play_from_prev_pv ? prev_pv[ply] : Move::null(), tt_move);
+    Move pv_move = play_from_prev_pv && ply < prev_pv.size() ? prev_pv[ply] : Move::null();
+    MoveOrdering move_ordering(board, moves, pv_move, tt_move);
 
     Score original_alpha = alpha;
     Move best_move = Move::null();
@@ -267,9 +269,9 @@ Search::Result Search::run(std::stop_token const& token) {
             .moves = pv_buffer
         };
         auto depth_start =  std::chrono::steady_clock::now();
-        Score score = search<PVNode>(d, 0, -INF, INF, child_pv, result.pv, true);
+        Score score = search<PVNode>(d, 0, -INF, INF, child_pv, result.pv, d != 1);
         auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - depth_start).count();
-        result.pv.assign(child_pv.moves, child_pv.moves + child_pv.len);
+        if (child_pv.len > 0) result.pv.assign(child_pv.moves, child_pv.moves + child_pv.len);
 
         if (search_stopped()) break;
         result.score = score;
