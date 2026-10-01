@@ -235,9 +235,9 @@ bool Board::is_insufficient_material() const {
 }
 
 int Board::repetition_count() const {
-    int count = 0;
+    int count = 1;
     uint64_t zhash = zhash_stack.back();
-    for (int i = 0; i <= state_stack.back().fifty_move_counter && i < zhash_stack.size(); i += 2) {
+    for (int i = 4; i <= state_stack.back().fifty_move_counter && i < zhash_stack.size(); i += 2) {
         if (zhash_stack[zhash_stack.size() - 1 - i] == zhash) {
             count++;
         }
