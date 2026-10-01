@@ -19,7 +19,9 @@ Score Search::qsearch(int ply, Score alpha, Score beta) {
     if (board.is_draw()) return 0;
 
     uint64_t zhash = board.zhash_stack.back();
-    auto* entry = qsearch_tt.lookup(zhash);
+    auto* entry = search_tt.lookup(zhash);
+    if (entry == nullptr)
+        entry = qsearch_tt.lookup(zhash);
     Move tt_move = Move::null();
     if (entry != nullptr) {
         Score tt_score = score_from_tt(entry->score, ply);
