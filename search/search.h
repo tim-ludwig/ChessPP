@@ -27,6 +27,7 @@ public:
     std::size_t tt_cuts = 0;
     std::size_t beta_cuts = 0;
     std::size_t first_move_cuts = 0;
+    std::size_t avg_cutoff_move = 0;
     std::size_t pv_researches = 0;
   };
 

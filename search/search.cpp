@@ -219,6 +219,7 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, std::vector<Mo
         if (alpha >= beta) {
             info.beta_cuts++;
             if (i == 0) info.first_move_cuts++;
+            info.avg_cutoff_move += i;
             break;
         }
     }
@@ -256,6 +257,7 @@ Search::Result Search::run(std::stop_token const& token) {
         info.nodes = 0;
         info.beta_cuts = 0;
         info.first_move_cuts = 0;
+        info.avg_cutoff_move = 0;
         info.pv_researches = 0;
         info.tt_cuts = 0;
 
@@ -288,6 +290,7 @@ Search::Result Search::run(std::stop_token const& token) {
 
         std::cout << "info string beta_cuts " << info.beta_cuts << std::endl;
         std::cout << "info string first_move_cuts " << info.first_move_cuts << std::endl;
+        std::cout << "info string avg_cutoff_move " << (info.beta_cuts > 0 ? (double)info.avg_cutoff_move / info.beta_cuts : 0) << std::endl;
         std::cout << "info string pv_researches " << info.pv_researches << std::endl;
         std::cout << "info string tt_cuts " << info.tt_cuts << std::endl;
         if (!options.pondering && (result.score > MATE_THRESHOLD || result.score < -MATE_THRESHOLD)) break;
