@@ -92,3 +92,13 @@ Score MoveOrdering::see(Move move) {
 
     return gain[0];
 }
+
+Score MoveOrdering::mvvlva(Move move) {
+    Score score = 0;
+    if (move.is_capture() && !move.is_en_passant()) {
+        PieceType victim = board.pieces[move.to()].type();
+        PieceType attacker = board.pieces[move.from()].type();
+        score = PIECE_VALUE[victim] * 10 - PIECE_VALUE[attacker];
+    }
+    return score;
+}

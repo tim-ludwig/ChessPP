@@ -58,6 +58,7 @@ public:
 
 private:
     Score see(Move move);
+    Score mvvlva(Move move);
 };
 
 
