@@ -100,31 +100,33 @@ Score Search::qsearch(int ply, Score alpha, Score beta) {
     return best;
 }
 
-void Search::build_pv_from_tt(int depth, TranspositionTable& tt, PV& pv) {
+void Search::build_pv_from_tt(int depth, int ply, int i, TranspositionTable& tt) {
     if (depth == 0) return;
     if (board.is_draw()) return;
 
     auto* entry = tt.lookup(board.zhash_stack.back());
     if (entry == nullptr || entry->best_move == Move::null() || entry->depth < depth) return;
+    Move move = entry->best_move;
 
     MoveList moves = legal_moves(board);
     bool found = false;
-    for (int i = 0; i < moves.size(); i++) {
-        if (moves[i] == entry->best_move) {
+    for (int j = 0; j < moves.size(); j++) {
+        if (moves[j] == move) {
             found = true;
             break;
         }
     }
     if (!found) return;
 
-    pv.moves[pv.len++] = entry->best_move;
-    board.make_move(entry->best_move);
-    build_pv_from_tt(depth - 1, tt, pv);
-    board.unmake_move(entry->best_move);
+    pv_length[ply] = i + 1;
+    pv_moves[ply][i] = move;
+    board.make_move(move);
+    build_pv_from_tt(depth - 1, ply, i + 1, tt);
+    board.unmake_move(move);
 }
 
 template<Search::NodeType node_type>
-Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::vector<Move> const& prev_pv, bool play_from_prev_pv) {
+Score Search::search(int depth, int ply, Score alpha, Score beta, std::vector<Move> const& prev_pv, bool play_from_prev_pv) {
     constexpr bool is_pv_node = node_type == PVNode;
     if (search_stopped()) return 0;
 
@@ -140,8 +142,7 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
             switch (entry->bound) {
                 case TranspositionTable::Entry::EXACT:
                     if constexpr (is_pv_node) {
-                        pv.len = 0;
-                        build_pv_from_tt(depth, search_tt, pv);
+                        build_pv_from_tt(depth, ply, 0, search_tt);
                     }
                     info.tt_cuts++;
                     return tt_score;
@@ -163,23 +164,16 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
         }
     }
 
-    if (depth == 0) {
-        info.nodes--;
-        return qsearch(ply, alpha, beta);
-    }
-
-    info.nodes++;
-
     MoveList moves = legal_moves(board);
     if (moves.size() == 0) {
         return moves.legality().checkers ? -MATE + ply : 0;
     }
 
-    Move pv_buffer[depth];
-    PV child_pv = {
-        .len = 0,
-        .moves = pv_buffer
-    };
+    info.nodes++;
+
+    if (depth == 0) {
+        return qsearch(ply, alpha, beta);
+    }
 
     Move pv_move = play_from_prev_pv && ply < prev_pv.size() ? prev_pv[ply] : Move::null();
     MoveOrdering move_ordering(board, moves, pv_move, tt_move);
@@ -189,22 +183,23 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
     for (int i = 0; i < moves.size(); i++) {
         Move move = move_ordering.getMove();
 
+        pv_length[ply + 1] = 0;
         Score score;
         board.make_move(move);
         if (i == 0) {
             score = -search<node_type>(depth - 1, ply + 1,
                 -beta, -alpha,
-                child_pv, prev_pv, play_from_prev_pv);
+                prev_pv, play_from_prev_pv);
         } else {
             score = -search<NonPVNode>(depth - 1, ply + 1,
                 -alpha - 1, -alpha,
-                child_pv, prev_pv, false);
+                prev_pv, false);
             if constexpr (is_pv_node) {
                 if (alpha < score && score < beta) {
                     info.pv_researches++;
                     score = -search<PVNode>(depth - 1, ply + 1,
                         -beta, -alpha,
-                        child_pv, prev_pv, false);
+                        prev_pv, false);
                 }
             }
         }
@@ -216,9 +211,9 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, PV& pv, std::v
             alpha = score;
             best_move = move;
             if constexpr (is_pv_node) {
-                pv.moves[0] = move;
-                memcpy(pv.moves + 1, child_pv.moves, child_pv.len * sizeof(Move));
-                pv.len = child_pv.len + 1;
+                pv_moves[ply][0] = move;
+                memcpy(&pv_moves[ply][1], &pv_moves[ply + 1][0], pv_length[ply + 1] * sizeof(Move));
+                pv_length[ply] = 1 + pv_length[ply + 1];
             }
         }
         if (alpha >= beta) {
@@ -264,16 +259,11 @@ Search::Result Search::run(std::stop_token const& token) {
         info.pv_researches = 0;
         info.tt_cuts = 0;
 
-
-        Move pv_buffer[d];
-        PV child_pv = {
-            .len = 0,
-            .moves = pv_buffer
-        };
         auto depth_start =  std::chrono::steady_clock::now();
-        Score score = search<PVNode>(d, 0, -INF, INF, child_pv, result.pv, d != 1);
+        pv_length[0] = 0;
+        Score score = search<PVNode>(d, 0, -INF, INF, result.pv, d != 1);
         auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - depth_start).count();
-        if (child_pv.len > 0) result.pv.assign(child_pv.moves, child_pv.moves + child_pv.len);
+        if (pv_length[0] > 0) result.pv.assign(&pv_moves[0][0], &pv_moves[0][pv_length[0]]);
 
         if (search_stopped()) break;
         result.score = score;

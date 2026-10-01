@@ -12,6 +12,8 @@
 #include "TranspositionTable.h"
 #include "../board/Move.h"
 
+#define MAXPLY 256
+
 class Search {
 public:
   using Result = struct {
@@ -46,24 +48,24 @@ public:
   Info info;
   TranspositionTable search_tt{1 << 20};
   TranspositionTable qsearch_tt{1 << 20};
-  std::stop_token stop;
 
+  explicit Search(Board& board) : board(board) {}
+
+  std::stop_token stop;
   Result run(std::stop_token const& token);
 
 private:
-  using PV = struct {
-    std::size_t len;
-    Move *moves;
-  };
+  int pv_length[MAXPLY];
+  Move pv_moves[MAXPLY][MAXPLY];
 
   Score qsearch(int ply, Score alpha, Score beta);
   template<NodeType node_type>
-  Score search(int depth, int ply, Score alpha, Score beta, PV& pv_buffer, std::vector<Move> const& prev_pv, bool play_from_prev_pv);
+  Score search(int depth, int ply, Score alpha, Score beta, std::vector<Move> const& prev_pv, bool play_from_prev_pv);
 
-  void build_pv_from_tt(int depth, TranspositionTable& tt, PV& pv);
+  void build_pv_from_tt(int depth, int ply, int i, TranspositionTable& tt);
 
   bool depth_allowed(int depth) const {
-    return !options.max_depth || depth <= options.max_depth.value();
+    return (!options.max_depth || depth <= options.max_depth.value()) && depth < MAXPLY;
   }
   bool search_stopped() const {
     return stop.stop_requested() || (options.start_time && options.time_budget && std::chrono::steady_clock::now() >= options.start_time.value() + options.time_budget.value());

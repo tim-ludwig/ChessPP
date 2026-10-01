@@ -14,9 +14,7 @@ class UCI {
 private:
     std::jthread worker;
     Board board;
-    Search search{
-        .board = board
-    };
+    Search search{board};
 
 public:
     void repl();
