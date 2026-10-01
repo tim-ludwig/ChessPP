@@ -64,7 +64,7 @@ Score Search::qsearch(int ply, Score alpha, Score beta) {
     if (moves.size() == 0) {
         best = in_check ? -MATE + ply : alpha;
     } else {
-        MoveOrdering move_ordering(board, moves, Move::null(), tt_move);
+        MoveOrdering move_ordering(board, moves, Move::null(), tt_move, history);
         for (int i = 0; i < moves.size(); i++) {
             Move move = move_ordering.getMove();
             board.make_move(move);
@@ -169,14 +169,14 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, std::vector<Mo
         return moves.legality().checkers ? -MATE + ply : 0;
     }
 
-    info.nodes++;
-
     if (depth == 0) {
         return qsearch(ply, alpha, beta);
     }
 
+    info.nodes++;
+
     Move pv_move = play_from_prev_pv && ply < prev_pv.size() ? prev_pv[ply] : Move::null();
-    MoveOrdering move_ordering(board, moves, pv_move, tt_move);
+    MoveOrdering move_ordering(board, moves, pv_move, tt_move, history);
 
     Score original_alpha = alpha;
     Move best_move = Move::null();
@@ -219,7 +219,16 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, std::vector<Mo
         if (alpha >= beta) {
             info.beta_cuts++;
             if (i == 0) info.first_move_cuts++;
-            info.avg_cutoff_move += i;
+            info.avg_cutoff_move += i + 1;
+
+            if (moves[i].is_quiet()) {
+                history.update(board.to_move, move, depth * depth);
+            }
+            for (int j = 0; j < i; j++) {
+                if (moves[j].is_quiet()) {
+                    history.update(board.to_move, moves[j], -(depth * depth));
+                }
+            }
             break;
         }
     }

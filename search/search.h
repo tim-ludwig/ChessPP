@@ -13,6 +13,21 @@
 #include "../board/Move.h"
 
 #define MAXPLY 256
+#define MAX_HISTORY 1000
+
+class History {
+public:
+  Score history[2][64][64] = {0};
+
+  void update(Color to_move, Move m, int bonus) {
+    bonus = std::clamp(bonus, -MAX_HISTORY, MAX_HISTORY);
+    history[to_move][m.from()][m.to()] += bonus - (history[to_move][m.from()][m.to()] * std::abs(bonus) / MAX_HISTORY);
+  }
+
+  Score get(Color to_move, Move m) const {
+    return history[to_move][m.from()][m.to()];
+  }
+};
 
 class Search {
 public:
@@ -58,6 +73,7 @@ public:
 private:
   int pv_length[MAXPLY];
   Move pv_moves[MAXPLY][MAXPLY];
+  History history;
 
   Score qsearch(int ply, Score alpha, Score beta);
   template<NodeType node_type>

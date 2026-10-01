@@ -9,6 +9,7 @@
 #include <optional>
 
 #include "evaluation.h"
+#include "search.h"
 #include "../board/Board.h"
 #include "../board/Move.h"
 #include "../move_gen/MoveGen.h"
@@ -23,9 +24,10 @@ class MoveOrdering {
     int ready = 0;
 
     int index = 0;
+    History const& history;
 
 public:
-    MoveOrdering(Board const& b, MoveList& m, Move pv_move, Move tt_move) : board(b), moves(m), scores(m.size(), 0) {
+    MoveOrdering(Board const& b, MoveList& m, Move pv_move, Move tt_move, History const& history) : board(b), moves(m), scores(m.size(), 0), history(history) {
         for (int i = 0; i < moves.size(); i++) {
             if (moves[i] == pv_move) {
                 scores[i] = std::numeric_limits<Score>::max();
@@ -45,6 +47,8 @@ public:
             for (int i = index; i < moves.size(); i++) {
                 if (moves[i].is_capture() || moves[i].is_promotion()) {
                     scores[i] = see(moves[i]);
+                } else {
+                    scores[i] = history.get(board.to_move, moves[i]);
                 }
             }
             ready = moves.size();
