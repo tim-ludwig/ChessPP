@@ -64,7 +64,7 @@ Score Search::qsearch(int ply, Score alpha, Score beta) {
     if (moves.size() == 0) {
         best = in_check ? -MATE + ply : alpha;
     } else {
-        MoveOrdering move_ordering(board, moves, Move::null(), tt_move, history);
+        MoveOrdering move_ordering(board, ply, moves, Move::null(), tt_move, history, killers);
         for (int i = 0; i < moves.size(); i++) {
             Move move = move_ordering.getMove();
             board.make_move(move);
@@ -176,7 +176,7 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, std::vector<Mo
     info.nodes++;
 
     Move pv_move = play_from_prev_pv && ply < prev_pv.size() ? prev_pv[ply] : Move::null();
-    MoveOrdering move_ordering(board, moves, pv_move, tt_move, history);
+    MoveOrdering move_ordering(board, ply, moves, pv_move, tt_move, history, killers);
 
     Score original_alpha = alpha;
     Move best_move = Move::null();
@@ -221,8 +221,9 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, std::vector<Mo
             if (i == 0) info.first_move_cuts++;
             info.avg_cutoff_move += i + 1;
 
-            if (moves[i].is_quiet()) {
+            if (move.is_quiet()) {
                 history.update(board.to_move, move, depth * depth);
+                killers.update(ply, move);
             }
             for (int j = 0; j < i; j++) {
                 if (moves[j].is_quiet()) {
@@ -255,6 +256,8 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, std::vector<Mo
 
 Search::Result Search::run(std::stop_token const& token) {
     stop = token;
+
+    killers.clear();
 
     MoveList moves = legal_moves(board);
     Result result {

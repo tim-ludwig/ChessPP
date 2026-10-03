@@ -13,7 +13,7 @@
 #include "../board/Move.h"
 
 #define MAXPLY 256
-#define MAX_HISTORY 1000
+#define MAX_HISTORY 900
 
 class History {
 public:
@@ -26,6 +26,28 @@ public:
 
   Score get(Color to_move, Move m) const {
     return history[to_move][m.from()][m.to()];
+  }
+};
+
+class Killers {
+public:
+  Move killers[2][MAXPLY] = {Move::null()};
+
+  void clear() {
+    for (int i = 0; i < MAXPLY; i++) {
+      killers[0][i] = Move::null();
+      killers[1][i] = Move::null();
+    }
+  }
+
+  void update(int ply, Move m) {
+    if (m == killers[0][ply]) return;
+    killers[1][ply] = killers[0][ply];
+    killers[0][ply] = m;
+  }
+
+  Move get(int ply, int i) const {
+    return killers[i][ply];
   }
 };
 
@@ -74,6 +96,7 @@ private:
   int pv_length[MAXPLY];
   Move pv_moves[MAXPLY][MAXPLY];
   History history;
+  Killers killers;
 
   Score qsearch(int ply, Score alpha, Score beta);
   template<NodeType node_type>
