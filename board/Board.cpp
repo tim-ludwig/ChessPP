@@ -140,6 +140,45 @@ void Board::unmake_move(const Move move) {
     assert(zhash_stack.back() == compute_zobrist_hash());
 }
 
+void Board::make_null_move() {
+    Color us = to_move;
+    Color them = 1 - us;
+
+    zhash_stack.push_back(zhash_stack.back());
+    uint64_t& zhash = zhash_stack.back();
+
+    // update additional state
+    state_stack.push_back(state_stack.back());
+    State& state = state_stack.back();
+    if (state.en_passant_square != NONE) {
+        zhash ^= zobrist.en_passant[state.en_passant_square % 8];
+        state.en_passant_square = NONE;
+    }
+
+    // update fifty move rule counter
+    state.fifty_move_counter++;
+
+    // update side to move and move counter
+    to_move = them;
+    zhash ^= zobrist.black_to_move;
+    if (them == WHITE) total_move_counter++;
+
+    assert(zhash == compute_zobrist_hash());
+}
+
+void Board::unmake_null_move() {
+    Color them = to_move;
+    Color us = 1 - them;
+
+    to_move = us;
+    if (them == WHITE) total_move_counter--;
+
+    state_stack.pop_back();
+    zhash_stack.pop_back();
+
+    assert(zhash_stack.back() == compute_zobrist_hash());
+}
+
 Board Board::setup_from_fen(std::span<const std::string> const& fen) {
     Board board;
     board.state_stack.push_back({

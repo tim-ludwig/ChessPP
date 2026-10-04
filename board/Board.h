@@ -41,6 +41,9 @@ struct Board {
     void make_move(Move move);
     void unmake_move(Move move);
 
+    void make_null_move();
+    void unmake_null_move();
+
     void print(Color perspective=WHITE) const;
 
     int repetition_count() const;

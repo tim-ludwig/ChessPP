@@ -126,7 +126,7 @@ void Search::build_pv_from_tt(int depth, int ply, int i, TranspositionTable& tt)
 }
 
 template<Search::NodeType node_type>
-Score Search::search(int depth, int ply, Score alpha, Score beta, std::vector<Move> const& prev_pv, bool play_from_prev_pv) {
+Score Search::search(int depth, int ply, Score alpha, Score beta, bool is_null_child, std::vector<Move> const& prev_pv, bool play_from_prev_pv) {
     constexpr bool is_pv_node = node_type == PVNode;
     if (search_stopped()) return 0;
 
@@ -173,6 +173,28 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, std::vector<Mo
         return qsearch(ply, alpha, beta);
     }
 
+    if constexpr (!is_pv_node) {
+        if (!is_null_child && depth >= NULL_MOVE_MIN_DEPTH && !moves.legality().checkers && (
+                board.bitboards[board.to_move][KNIGHT]
+                | board.bitboards[board.to_move][BISHOP]
+                | board.bitboards[board.to_move][ROOK]
+                | board.bitboards[board.to_move][QUEEN]
+            )) {
+            board.make_null_move();
+            Score score = -search<NonPVNode>(depth - 1 - NULL_MOVE_REDUCTION, ply + 1,
+                -beta - 1, -beta, true,
+                prev_pv, false);
+            board.unmake_null_move();
+
+            if (search_stopped()) return 0;
+
+            if (score >= beta && -MATE_THRESHOLD < score && score < MATE_THRESHOLD) {
+                info.null_move_cuts++;
+                return beta;
+            }
+        }
+    }
+
     info.nodes++;
 
     Move pv_move = play_from_prev_pv && ply < prev_pv.size() ? prev_pv[ply] : Move::null();
@@ -188,17 +210,17 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, std::vector<Mo
         board.make_move(move);
         if (i == 0) {
             score = -search<node_type>(depth - 1, ply + 1,
-                -beta, -alpha,
+                -beta, -alpha, false,
                 prev_pv, play_from_prev_pv);
         } else {
             score = -search<NonPVNode>(depth - 1, ply + 1,
-                -alpha - 1, -alpha,
+                -alpha - 1, -alpha, false,
                 prev_pv, false);
             if constexpr (is_pv_node) {
                 if (alpha < score && score < beta) {
                     info.pv_researches++;
                     score = -search<PVNode>(depth - 1, ply + 1,
-                        -beta, -alpha,
+                        -beta, -alpha, false,
                         prev_pv, false);
                 }
             }
@@ -272,10 +294,11 @@ Search::Result Search::run(std::stop_token const& token) {
         info.avg_cutoff_move = 0;
         info.pv_researches = 0;
         info.tt_cuts = 0;
+        info.null_move_cuts = 0;
 
         auto depth_start =  std::chrono::steady_clock::now();
         pv_length[0] = 0;
-        Score score = search<PVNode>(d, 0, -INF, INF, result.pv, d != 1);
+        Score score = search<PVNode>(d, 0, -INF, INF, false, result.pv, d != 1);
         auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - depth_start).count();
         if (pv_length[0] > 0) result.pv.assign(&pv_moves[0][0], &pv_moves[0][pv_length[0]]);
 
@@ -303,8 +326,9 @@ Search::Result Search::run(std::stop_token const& token) {
         std::cout << "info string beta_cuts " << info.beta_cuts << std::endl;
         std::cout << "info string first_move_cuts " << info.first_move_cuts << std::endl;
         std::cout << "info string avg_cutoff_move " << (info.beta_cuts > 0 ? (double)info.avg_cutoff_move / info.beta_cuts : 0) << std::endl;
-        std::cout << "info string pv_researches " << info.pv_researches << std::endl;
         std::cout << "info string tt_cuts " << info.tt_cuts << std::endl;
+        std::cout << "info string null_move_cuts " << info.null_move_cuts << std::endl;
+        std::cout << "info string pv_researches " << info.pv_researches << std::endl;
         if (!options.pondering && (result.score > MATE_THRESHOLD || result.score < -MATE_THRESHOLD)) break;
     }
     search_tt.new_generation();

@@ -14,6 +14,8 @@
 
 #define MAXPLY 256
 #define MAX_HISTORY 900
+#define NULL_MOVE_MIN_DEPTH 6
+#define NULL_MOVE_REDUCTION 2
 
 class History {
 public:
@@ -66,6 +68,7 @@ public:
     std::size_t first_move_cuts = 0;
     std::size_t avg_cutoff_move = 0;
     std::size_t pv_researches = 0;
+    std::size_t null_move_cuts = 0;
   };
 
   using Options = struct {
@@ -100,7 +103,7 @@ private:
 
   Score qsearch(int ply, Score alpha, Score beta);
   template<NodeType node_type>
-  Score search(int depth, int ply, Score alpha, Score beta, std::vector<Move> const& prev_pv, bool play_from_prev_pv);
+  Score search(int depth, int ply, Score alpha, Score beta, bool is_null_child, std::vector<Move> const& prev_pv, bool play_from_prev_pv);
 
   void build_pv_from_tt(int depth, int ply, int i, TranspositionTable& tt);
 
