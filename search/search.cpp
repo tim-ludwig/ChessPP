@@ -185,10 +185,11 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, bool is_null_c
                 | board.bitboards[board.to_move][BISHOP]
                 | board.bitboards[board.to_move][ROOK]
                 | board.bitboards[board.to_move][QUEEN]
-            )) {
+            ) && eval(board) >= beta) {
             board.make_null_move();
-            Score score = -search<NonPVNode>(depth - 1 - NULL_MOVE_REDUCTION, ply + 1,
-                -beta - 1, -beta, true,
+            int new_depth = std::max(0, depth - 1 - NULL_MOVE_REDUCTION);
+            Score score = -search<NonPVNode>(new_depth, ply + 1,
+                -beta, -beta + 1, true,
                 prev_pv, false);
             board.unmake_null_move();
 
@@ -219,11 +220,12 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, bool is_null_c
                 -beta, -alpha, false,
                 prev_pv, play_from_prev_pv);
         } else {
-            bool reduce = !(is_pv_node || i < 3 || depth < LMR_MINDEPTH
+            bool reduce = !(is_pv_node || i < 3 || depth < LMR_MIN_DEPTH
                 || moves.legality().checkers
                 || move == killers.get(ply, 0) || move == killers.get(ply, 1));
             int r = reduce ? reduction(depth, i, move) : 0;
-            score = -search<NonPVNode>(depth - 1 - r, ply + 1,
+            int new_depth = std::max(0, depth - 1 - r);
+            score = -search<NonPVNode>(new_depth, ply + 1,
                 -alpha - 1, -alpha, false,
                 prev_pv, false);
             if (reduce && score > alpha) {

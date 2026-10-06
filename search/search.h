@@ -14,10 +14,11 @@
 
 #define MAXPLY 256
 #define MAX_HISTORY 900
-#define NULL_MOVE_MIN_DEPTH 6
-#define NULL_MOVE_REDUCTION 2
 
-#define LMR_MINDEPTH 3
+#define NULL_MOVE_MIN_DEPTH 4
+#define NULL_MOVE_REDUCTION 3
+
+#define LMR_MIN_DEPTH 3
 
 class History {
 public:
