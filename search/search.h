@@ -17,6 +17,8 @@
 #define NULL_MOVE_MIN_DEPTH 6
 #define NULL_MOVE_REDUCTION 2
 
+#define LMR_MINDEPTH 3
+
 class History {
 public:
   Score history[2][64][64] = {0};
@@ -104,6 +106,8 @@ private:
   Score qsearch(int ply, Score alpha, Score beta);
   template<NodeType node_type>
   Score search(int depth, int ply, Score alpha, Score beta, bool is_null_child, std::vector<Move> const& prev_pv, bool play_from_prev_pv);
+
+  int reduction(int depth, int move_index, Move move) const;
 
   void build_pv_from_tt(int depth, int ply, int i, TranspositionTable& tt);
 

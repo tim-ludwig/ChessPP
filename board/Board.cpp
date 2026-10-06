@@ -286,7 +286,7 @@ int Board::repetition_count() const {
 
 bool Board::is_draw() const {
     if (state_stack.back().fifty_move_counter >= 100) return true;
-    if (repetition_count() >= 3) return true;
+    if (repetition_count() >= 2) return true;
     if (is_insufficient_material()) return true;
     return false;
 }

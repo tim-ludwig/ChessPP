@@ -4,6 +4,7 @@
 
 #include "search.h"
 
+#include <cmath>
 #include <cstring>
 
 #include "MoveOrdering.h"
@@ -125,6 +126,11 @@ void Search::build_pv_from_tt(int depth, int ply, int i, TranspositionTable& tt)
     board.unmake_move(move);
 }
 
+int Search::reduction(int depth, int move_index, Move move) const {
+    if (move.is_capture() || move.is_promotion()) return 0.20 + std::log(depth) * std::log(move_index) / 3.35;
+    return 1.35 + std::log(depth) * std::log(move_index) / 2.75;
+}
+
 template<Search::NodeType node_type>
 Score Search::search(int depth, int ply, Score alpha, Score beta, bool is_null_child, std::vector<Move> const& prev_pv, bool play_from_prev_pv) {
     constexpr bool is_pv_node = node_type == PVNode;
@@ -213,9 +219,18 @@ Score Search::search(int depth, int ply, Score alpha, Score beta, bool is_null_c
                 -beta, -alpha, false,
                 prev_pv, play_from_prev_pv);
         } else {
-            score = -search<NonPVNode>(depth - 1, ply + 1,
+            bool reduce = !(is_pv_node || i < 3 || depth < LMR_MINDEPTH
+                || moves.legality().checkers
+                || move == killers.get(ply, 0) || move == killers.get(ply, 1));
+            int r = reduce ? reduction(depth, i, move) : 0;
+            score = -search<NonPVNode>(depth - 1 - r, ply + 1,
                 -alpha - 1, -alpha, false,
                 prev_pv, false);
+            if (reduce && score > alpha) {
+                score = -search<node_type>(depth - 1, ply + 1,
+                    -alpha - 1, -alpha, false,
+                    prev_pv, false);
+            }
             if constexpr (is_pv_node) {
                 if (alpha < score && score < beta) {
                     info.pv_researches++;
