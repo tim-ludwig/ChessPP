@@ -15,6 +15,8 @@
 #define MAXPLY 256
 #define MAX_HISTORY 900
 
+#define LMR_MINDEPTH 3
+
 class History {
 public:
   Score history[2][64][64] = {0};
@@ -101,6 +103,8 @@ private:
   Score qsearch(int ply, Score alpha, Score beta);
   template<NodeType node_type>
   Score search(int depth, int ply, Score alpha, Score beta, std::vector<Move> const& prev_pv, bool play_from_prev_pv);
+
+  int reduction(int depth, int move_index, Move move) const;
 
   void build_pv_from_tt(int depth, int ply, int i, TranspositionTable& tt);
 
