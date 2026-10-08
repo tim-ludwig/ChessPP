@@ -72,6 +72,7 @@ public:
     std::size_t avg_cutoff_move = 0;
     std::size_t pv_researches = 0;
     std::size_t null_move_cuts = 0;
+    std::size_t aspiration_researches = 0;
   };
 
   using Options = struct {

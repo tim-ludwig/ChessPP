@@ -303,6 +303,7 @@ Search::Result Search::run(std::stop_token const& token) {
         .score = -INF,
         .pv = {moves[0]}
     };
+    Score alpha = -INF, beta = INF;
     for (int d = 1; depth_allowed(d); d++) {
         info.depth = d;
         info.nodes = 0;
@@ -312,10 +313,26 @@ Search::Result Search::run(std::stop_token const& token) {
         info.pv_researches = 0;
         info.tt_cuts = 0;
         info.null_move_cuts = 0;
+        info.aspiration_researches = 0;
 
         auto depth_start =  std::chrono::steady_clock::now();
+
         pv_length[0] = 0;
-        Score score = search<PVNode>(d, 0, -INF, INF, false, result.pv, d != 1);
+        Score score = search<PVNode>(d, 0, alpha, beta, false, result.pv, d != 1);
+
+        int aspiration_step = 25;
+        while (!search_stopped() && !(alpha < score && score < beta)) {
+            pv_length[0] = 0;
+            if (score <= alpha) alpha -= aspiration_step;
+            else if (score >= beta) beta += aspiration_step;
+            aspiration_step *= 2;
+            info.aspiration_researches++;
+            score = search<PVNode>(d, 0, alpha, beta, false, result.pv, d != 1);
+        }
+
+        alpha = score - 25;
+        beta = score + 25;
+
         auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - depth_start).count();
         if (pv_length[0] > 0) result.pv.assign(&pv_moves[0][0], &pv_moves[0][pv_length[0]]);
 
@@ -346,6 +363,7 @@ Search::Result Search::run(std::stop_token const& token) {
         std::cout << "info string tt_cuts " << info.tt_cuts << std::endl;
         std::cout << "info string null_move_cuts " << info.null_move_cuts << std::endl;
         std::cout << "info string pv_researches " << info.pv_researches << std::endl;
+        std::cout << "info string aspiration_researches " << info.aspiration_researches << std::endl;
         if (!options.pondering && (result.score > MATE_THRESHOLD || result.score < -MATE_THRESHOLD)) break;
     }
     search_tt.new_generation();
